@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, File, UploadFile
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from typing import Optional
@@ -7,6 +7,7 @@ from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from pymongo import MongoClient
 import uvicorn
+import os
 
 # MongoDB connection
 client = MongoClient("mongodb+srv://swoyam:iiitdrive@drive.9oviyyw.mongodb.net/")
@@ -108,6 +109,30 @@ async def get_directories(token: str = Depends(oauth2_scheme), path: str = "/"):
         entries = os.listdir(f"./uploaded/{username}"+path)
         result_dict = {"directories": entries}
         return result_dict
+    except JWTError:
+        raise credentials_exception
+    
+@app.post("/upload")
+async def upload_file(file: UploadFile=File(...), token: str = Depends(oauth2_scheme), path: str = "/"):
+    credentials_exception = HTTPException(
+        status_code=401, detail="Could not validate credentials"
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        token_data = TokenData(username=username)
+        import shutil
+        from pathlib import Path
+        #this will create a folder with username in uploaded folder
+        os.makedirs(f"uploaded/{username}", exist_ok=True)
+        #this will save the file in the folder created above
+        file_path = f"uploaded/{username}{path}"
+        Path(file_path).mkdir(parents=True, exist_ok=True)
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        return {"result": "File uploaded"}
     except JWTError:
         raise credentials_exception
 
