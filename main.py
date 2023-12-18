@@ -113,6 +113,23 @@ async def get_directories(token: str = Depends(oauth2_scheme), path: str = "/"):
     except JWTError:
         raise credentials_exception
     
+@app.put("/create_directory")
+async def create_directory(token: str = Depends(oauth2_scheme), path: str = "/", directory_name: str = "NewFolder"):
+    credentials_exception = HTTPException(
+        status_code=401, detail="Could not validate credentials"
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        token_data = TokenData(username=username)
+        import os
+        os.makedirs(f"./uploaded/{username}{path}/{directory_name}")
+        return {"result": "Directory created"}
+    except JWTError:
+        raise credentials_exception
+    
 @app.post("/upload")
 async def upload_file(token: str = Depends(oauth2_scheme), file: UploadFile=File(...), path: str = "/"):
     credentials_exception = HTTPException(
@@ -177,6 +194,25 @@ async def delete_file(token: str = Depends(oauth2_scheme), path: str = "/"):
         os.remove(file_path)
         db["files"].delete_one({"path": file_path})
         return {"result": "File deleted"}
+    except JWTError:
+        raise credentials_exception
+    
+@app.delete("/delete_directory")
+async def delete_directory(token: str = Depends(oauth2_scheme), path: str = "/"):
+    credentials_exception = HTTPException(
+        status_code=401, detail="Could not validate credentials"
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        token_data = TokenData(username=username)
+        from pathlib import Path
+        file_path = f"./uploaded/{username}{path}"
+        import shutil
+        shutil.rmtree(file_path)
+        return {"result": "Directory deleted"}
     except JWTError:
         raise credentials_exception
 
