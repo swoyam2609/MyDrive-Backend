@@ -66,7 +66,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     action = {
         "time" : datetime.now(),
         "action" : "Login",
-        "event" : "Login action performed by user {user.username}"
+        "event" : f"Login action performed by user {user.username}"
     }
     db["actions"].insert_one(action)
     return {"access_token": access_token, "token_type": "bearer"}
@@ -82,7 +82,7 @@ async def signup(user: User, password: str):
     action = {
         "time" : datetime.now(),
         "action" : "SignUp",
-        "event" : "New user {user.username} signed up"
+        "event" : f"New user {user.username} signed up"
     }
     db["actions"].insert_one(action)
     return {"result": "User created"}
@@ -124,7 +124,7 @@ async def get_directories(token: str = Depends(oauth2_scheme), path: str = "/"):
         action = {
             "time" : datetime.now(),
             "action" : "GetDirectories",
-            "event" : "User {user.username} requested directories"
+            "event" : f"User {username} requested directories"
         }
         db["actions"].insert_one(action)
         return result_dict
@@ -147,7 +147,7 @@ async def create_directory(token: str = Depends(oauth2_scheme), path: str = "/",
         action = {
             "time" : datetime.now(),
             "action" : "CreateDirectory",
-            "event" : "User {user.username} created a directory named {directory_name}"
+            "event" : f"User {username} created a directory named {directory_name}"
         }
         db["actions"].insert_one(action)
         return {"result": "Directory created"}
@@ -184,7 +184,7 @@ async def upload_file(token: str = Depends(oauth2_scheme), file: UploadFile=File
         action = {
             "time" : datetime.now(),
             "action" : "Upload",
-            "event" : "User {user.username} uploaded a file named {file.filename}"
+            "event" : f"User {username} uploaded a file named {file.filename}"
         }
         db["actions"].insert_one(action)
         return {"result": "File uploaded"}
@@ -207,7 +207,7 @@ async def download_file(token: str = Depends(oauth2_scheme), path: str = "/"):
         action = {
             "time" : datetime.now(),
             "action" : "Download",
-            "event" : "User {user.username} downloaded the file {file.filename}"
+            "event" : f"User {username} downloaded the file at {file_path}"
         }
         db["actions"].insert_one(action)
         return FileResponse(file_path, media_type='application/octet-stream', filename=file_path)
@@ -232,7 +232,7 @@ async def delete_file(token: str = Depends(oauth2_scheme), path: str = "/"):
         action = {
             "time" : datetime.now(),
             "action" : "Delete",
-            "event" : "User {user.username} deleted the file {file.filename}"
+            "event" : f"User {username} deleted the file at {file_path}"
         }
         db["actions"].insert_one(action)
         return {"result": "File deleted"}
@@ -257,7 +257,7 @@ async def delete_directory(token: str = Depends(oauth2_scheme), path: str = "/")
         action = {
             "time" : datetime.now(),
             "action" : "DeleteDirectory",
-            "event" : "User {user.username} deleted the directory {file.filename}"
+            "event" : f"User {username} deleted the directory {file_path}"
         }
         db["actions"].insert_one(action)
         return {"result": "Directory deleted"}
