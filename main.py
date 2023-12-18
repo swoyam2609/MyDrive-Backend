@@ -113,7 +113,7 @@ async def get_directories(token: str = Depends(oauth2_scheme), path: str = "/"):
         raise credentials_exception
     
 @app.post("/upload")
-async def upload_file(file: UploadFile=File(...), token: str = Depends(oauth2_scheme), path: str = "/"):
+async def upload_file(token: str = Depends(oauth2_scheme), file: UploadFile=File(...), path: str = "/"):
     credentials_exception = HTTPException(
         status_code=401, detail="Could not validate credentials"
     )
@@ -123,15 +123,22 @@ async def upload_file(file: UploadFile=File(...), token: str = Depends(oauth2_sc
         if username is None:
             raise credentials_exception
         token_data = TokenData(username=username)
-        import shutil
         from pathlib import Path
-        #this will create a folder with username in uploaded folder
-        os.makedirs(f"uploaded/{username}", exist_ok=True)
+        os.makedirs(f"./uploaded/{username}", exist_ok=True)
         #this will save the file in the folder created above
-        file_path = f"uploaded/{username}{path}"
-        Path(file_path).mkdir(parents=True, exist_ok=True)
+        file_path = f"./uploaded/{username}{path}{file.filename}"
         with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+            buffer.write(await file.read())
+        #create a dictionary with details of the uploaded files in it
+        file_details = {
+            "filename": file.filename, 
+            "content_type": file.content_type, 
+            "path" : file_path, 
+            "size": os.path.getsize(file_path), 
+            "uploader": username, 
+            "upload_time": datetime.now()
+        }
+        db["files"].insert_one(file_details)
         return {"result": "File uploaded"}
     except JWTError:
         raise credentials_exception
