@@ -144,21 +144,39 @@ async def upload_file(token: str = Depends(oauth2_scheme), file: UploadFile=File
     except JWTError:
         raise credentials_exception
     
-#download file
 @app.get("/download")
-async def download_file(username: str, path: str = "/"):
+async def download_file(token: str = Depends(oauth2_scheme), path: str = "/"):
     credentials_exception = HTTPException(
         status_code=401, detail="Could not validate credentials"
     )
     try:
-        # payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        # username: str = payload.get("sub")
-        # if username is None:
-        #     raise credentials_exception
-        # token_data = TokenData(username=username)
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        token_data = TokenData(username=username)
         from pathlib import Path
         file_path = f"./uploaded/{username}{path}"
         return FileResponse(file_path, media_type='application/octet-stream', filename=file_path)
+    except JWTError:
+        raise credentials_exception
+    
+@app.delete("/delete")
+async def delete_file(token: str = Depends(oauth2_scheme), path: str = "/"):
+    credentials_exception = HTTPException(
+        status_code=401, detail="Could not validate credentials"
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        token_data = TokenData(username=username)
+        from pathlib import Path
+        file_path = f"./uploaded/{username}{path}"
+        os.remove(file_path)
+        db["files"].delete_one({"path": file_path})
+        return {"result": "File deleted"}
     except JWTError:
         raise credentials_exception
 
