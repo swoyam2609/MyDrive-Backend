@@ -12,7 +12,7 @@ import os
 
 # MongoDB connection
 client = MongoClient("mongodb+srv://swoyam:iiitdrive@drive.9oviyyw.mongodb.net/")
-db = client.test
+db = client.production
 
 SECRET_KEY = "swoyamsiddharthnayak"
 ALGORITHM = "HS256"
@@ -63,6 +63,12 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     access_token = create_access_token(
         data={"sub": user.username}, expires_delta=access_token_expires
     )
+    action = {
+        "time" : datetime.now(),
+        "action" : "Login",
+        "event" : "Login action performed by user {user.username}"
+    }
+    db["actions"].insert_one(action)
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.post("/signup")
@@ -73,6 +79,12 @@ async def signup(user: User, password: str):
     import os
     #this will create a folder with username in uploaded folder
     os.makedirs(f"uploaded/{user.username}")
+    action = {
+        "time" : datetime.now(),
+        "action" : "SignUp",
+        "event" : "New user {user.username} signed up"
+    }
+    db["actions"].insert_one(action)
     return {"result": "User created"}
 
 # for testing purpose, willbe deleted later
@@ -109,6 +121,12 @@ async def get_directories(token: str = Depends(oauth2_scheme), path: str = "/"):
         import os
         entries = os.listdir(f"./uploaded/{username}"+path)
         result_dict = {"directories": entries}
+        action = {
+            "time" : datetime.now(),
+            "action" : "GetDirectories",
+            "event" : "User {user.username} requested directories"
+        }
+        db["actions"].insert_one(action)
         return result_dict
     except JWTError:
         raise credentials_exception
@@ -126,6 +144,12 @@ async def create_directory(token: str = Depends(oauth2_scheme), path: str = "/",
         token_data = TokenData(username=username)
         import os
         os.makedirs(f"./uploaded/{username}{path}/{directory_name}")
+        action = {
+            "time" : datetime.now(),
+            "action" : "CreateDirectory",
+            "event" : "User {user.username} created a directory named {directory_name}"
+        }
+        db["actions"].insert_one(action)
         return {"result": "Directory created"}
     except JWTError:
         raise credentials_exception
@@ -157,6 +181,12 @@ async def upload_file(token: str = Depends(oauth2_scheme), file: UploadFile=File
             "upload_time": datetime.now()
         }
         db["files"].insert_one(file_details)
+        action = {
+            "time" : datetime.now(),
+            "action" : "Upload",
+            "event" : "User {user.username} uploaded a file named {file.filename}"
+        }
+        db["actions"].insert_one(action)
         return {"result": "File uploaded"}
     except JWTError:
         raise credentials_exception
@@ -174,6 +204,12 @@ async def download_file(token: str = Depends(oauth2_scheme), path: str = "/"):
         token_data = TokenData(username=username)
         from pathlib import Path
         file_path = f"./uploaded/{username}{path}"
+        action = {
+            "time" : datetime.now(),
+            "action" : "Download",
+            "event" : "User {user.username} downloaded the file {file.filename}"
+        }
+        db["actions"].insert_one(action)
         return FileResponse(file_path, media_type='application/octet-stream', filename=file_path)
     except JWTError:
         raise credentials_exception
@@ -193,6 +229,12 @@ async def delete_file(token: str = Depends(oauth2_scheme), path: str = "/"):
         file_path = f"./uploaded/{username}{path}"
         os.remove(file_path)
         db["files"].delete_one({"path": file_path})
+        action = {
+            "time" : datetime.now(),
+            "action" : "Delete",
+            "event" : "User {user.username} deleted the file {file.filename}"
+        }
+        db["actions"].insert_one(action)
         return {"result": "File deleted"}
     except JWTError:
         raise credentials_exception
@@ -212,6 +254,12 @@ async def delete_directory(token: str = Depends(oauth2_scheme), path: str = "/")
         file_path = f"./uploaded/{username}{path}"
         import shutil
         shutil.rmtree(file_path)
+        action = {
+            "time" : datetime.now(),
+            "action" : "DeleteDirectory",
+            "event" : "User {user.username} deleted the directory {file.filename}"
+        }
+        db["actions"].insert_one(action)
         return {"result": "Directory deleted"}
     except JWTError:
         raise credentials_exception
