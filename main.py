@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 from pymongo import MongoClient
 import uvicorn
 import os
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 # MongoDB connection
 client = MongoClient("mongodb+srv://swoyam:iiitdrive@drive.9oviyyw.mongodb.net/")
@@ -19,6 +21,16 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 app = FastAPI()
+
+origins = ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class User(BaseModel):
     username: str
