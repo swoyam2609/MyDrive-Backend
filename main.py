@@ -94,7 +94,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-@app.post("/token", tags=["User Accounts"])
+@app.post("/users/token", tags=["User Accounts"])
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     user_dict = db["users"].find_one({"username": form_data.username})
     if not user_dict:
@@ -116,7 +116,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     db["actions"].insert_one(action)
     return {"access_token": access_token, "token_type": "bearer"}
 
-@app.post("/signup", tags=["User Accounts"])
+@app.post("/users/signup", tags=["User Accounts"])
 async def signup(user: User, password: str):
     hashed_password = fake_hash_password(password)
     user_in_db = UserInDB(**user.dict(), hashed_password=hashed_password)
@@ -132,7 +132,7 @@ async def signup(user: User, password: str):
     db["actions"].insert_one(action)
     return {"result": "User created"}
 
-@app.post("/reset_password", tags=["User Accounts"])
+@app.post("/users/reset_password", tags=["User Accounts"])
 async def forgot_password(username: str):
     user = db["users"].find_one({"username": username})
     if user:
@@ -148,7 +148,7 @@ async def forgot_password(username: str):
     else:
         raise HTTPException(status_code=404, detail="User not found")
 
-@app.post("/reset_password/confirm", tags=["User Accounts"])  
+@app.post("/users/reset_password/confirm", tags=["User Accounts"])  
 async def reset_password(
     username: str,
     new_password: str,
@@ -186,7 +186,7 @@ async def read_users_me(token: str = Depends(oauth2_scheme)):
     user_dict["_id"] = str(user_dict["_id"])  # Convert ObjectId to string
     return user_dict
 
-@app.get("/directories", tags=["File Operations"])
+@app.get("/directory/directories", tags=["File Operations"])
 async def get_directories(token: str = Depends(oauth2_scheme), path: str = "/"):
     credentials_exception = HTTPException(
         status_code=401, detail="Could not validate credentials"
@@ -210,7 +210,7 @@ async def get_directories(token: str = Depends(oauth2_scheme), path: str = "/"):
     except JWTError:
         raise credentials_exception
     
-@app.put("/create_directory", tags=["File Operations"])
+@app.put("/directory/create_directory", tags=["File Operations"])
 async def create_directory(token: str = Depends(oauth2_scheme), path: str = "/", directory_name: str = "NewFolder"):
     credentials_exception = HTTPException(
         status_code=401, detail="Could not validate credentials"
@@ -233,7 +233,7 @@ async def create_directory(token: str = Depends(oauth2_scheme), path: str = "/",
     except JWTError:
         raise credentials_exception
     
-@app.post("/upload", tags=["File Operations"])
+@app.post("/file/upload", tags=["File Operations"])
 async def upload_file(token: str = Depends(oauth2_scheme), file: UploadFile=File(...), path: str = "/"):
     credentials_exception = HTTPException(
         status_code=401, detail="Could not validate credentials"
@@ -270,7 +270,7 @@ async def upload_file(token: str = Depends(oauth2_scheme), file: UploadFile=File
     except JWTError:
         raise credentials_exception
     
-@app.get("/download", tags=["File Operations"])
+@app.get("/file/download", tags=["File Operations"])
 async def download_file(token: str = Depends(oauth2_scheme), path: str = "/"):
     credentials_exception = HTTPException(
         status_code=401, detail="Could not validate credentials"
@@ -293,7 +293,7 @@ async def download_file(token: str = Depends(oauth2_scheme), path: str = "/"):
     except JWTError:
         raise credentials_exception
     
-@app.delete("/delete", tags=["File Operations"])
+@app.delete("/file/delete", tags=["File Operations"])
 async def delete_file(token: str = Depends(oauth2_scheme), path: str = "/"):
     credentials_exception = HTTPException(
         status_code=401, detail="Could not validate credentials"
@@ -318,7 +318,7 @@ async def delete_file(token: str = Depends(oauth2_scheme), path: str = "/"):
     except JWTError:
         raise credentials_exception
     
-@app.delete("/delete_directory", tags=["File Operations"])
+@app.delete("/directory/delete", tags=["File Operations"])
 async def delete_directory(token: str = Depends(oauth2_scheme), path: str = "/"):
     credentials_exception = HTTPException(
         status_code=401, detail="Could not validate credentials"
@@ -343,7 +343,7 @@ async def delete_directory(token: str = Depends(oauth2_scheme), path: str = "/")
     except JWTError:
         raise credentials_exception
     
-@app.put("/rename", tags=["File Operations"])
+@app.put("/file/rename", tags=["File Operations"])
 async def rename_file(token: str = Depends(oauth2_scheme), path: str = "/", new_name: str = "NewName"):
     credentials_exception = HTTPException(
         status_code=401, detail="Could not validate credentials"
@@ -366,6 +366,29 @@ async def rename_file(token: str = Depends(oauth2_scheme), path: str = "/", new_
         }
         db["actions"].insert_one(action)
         return {"result": "File renamed"}
+    except JWTError:
+        raise credentials_exception
+    
+@app.put("/file/favourite", tags=["File Operations"])
+async def favourite_file(token: str = Depends(oauth2_scheme), path: str = "/"):
+    credentials_exception = HTTPException(
+        status_code=401, detail="Could not validate credentials"
+    )
+    try:
+        import os
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        file_path = f"./uploaded/{username}{path}"
+        db["files"].update_one({"path": file_path}, {"$set": {"favourite": True}})
+        action = {
+            "time" : datetime.now(),
+            "action" : "Favourite",
+            "event" : f"User {username} favourited the file at {file_path}"
+        }
+        db["actions"].insert_one(action)
+        return {"result": "File favourited"}
     except JWTError:
         raise credentials_exception
 
