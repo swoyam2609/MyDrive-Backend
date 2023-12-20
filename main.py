@@ -434,6 +434,34 @@ async def get_favourites(token: str = Depends(oauth2_scheme)):
         return {"favourites": favourites}
     except JWTError:
         raise credentials_exception
+    
+@app.get("/file/count", tags=["File Operations"])
+async def count_files(token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=401, detail="Could not validate credentials"
+    )
+    try:
+        import os
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        images = 0
+        videos = 0
+        documents = 0
+        for file in db["files"].find({"uploader": username}):
+            file["_id"] = str(file["_id"])  # Convert ObjectId to string
+            if os.path.isdir(file["path"]):
+                folders += 1
+            elif file["content_type"].startswith("image"):
+                images += 1
+            elif file["content_type"].startswith("video"):
+                videos += 1
+            else:
+                documents += 1
+        return {"images": images, "videos": videos, "documents": documents}
+    except JWTError:
+        raise credentials_exception
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
