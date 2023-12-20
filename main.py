@@ -391,6 +391,29 @@ async def favourite_file(token: str = Depends(oauth2_scheme), path: str = "/"):
         return {"result": "File favourited"}
     except JWTError:
         raise credentials_exception
+    
+@app.put("/file/unfavourite", tags=["File Operations"])
+async def unfavourite_file(token: str = Depends(oauth2_scheme), path: str = "/"):
+    credentials_exception = HTTPException(
+        status_code=401, detail="Could not validate credentials"
+    )
+    try:
+        import os
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        file_path = f"./uploaded/{username}{path}"
+        db["files"].update_one({"path": file_path}, {"$set": {"favourite": False}})
+        action = {
+            "time" : datetime.now(),
+            "action" : "Favourite",
+            "event" : f"User {username} favourited the file at {file_path}"
+        }
+        db["actions"].insert_one(action)
+        return {"result": "File favourited"}
+    except JWTError:
+        raise credentials_exception
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
