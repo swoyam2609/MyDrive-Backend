@@ -19,7 +19,7 @@ import random
 
 # MongoDB connection
 client = MongoClient("mongodb+srv://swoyam:iiitdrive@drive.9oviyyw.mongodb.net/")
-db = client.production
+db = client.test
 
 SECRET_KEY = "swoyamsiddharthnayak"
 ALGORITHM = "HS256"
@@ -340,6 +340,32 @@ async def delete_directory(token: str = Depends(oauth2_scheme), path: str = "/")
         }
         db["actions"].insert_one(action)
         return {"result": "Directory deleted"}
+    except JWTError:
+        raise credentials_exception
+    
+@app.put("/rename", tags=["File Operations"])
+async def rename_file(token: str = Depends(oauth2_scheme), path: str = "/", new_name: str = "NewName"):
+    credentials_exception = HTTPException(
+        status_code=401, detail="Could not validate credentials"
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        token_data = TokenData(username=username)
+        from pathlib import Path
+        file_path = f"./uploaded/{username}{path}"
+        new_path = f"./uploaded/{username}/{new_name}"
+        os.rename(file_path, new_path)
+        db["files"].update_one({"path": file_path}, {"$set": {"path": new_path}})
+        action = {
+            "time" : datetime.now(),
+            "action" : "Rename",
+            "event" : f"User {username} renamed the file at {file_path} to {new_name}"
+        }
+        db["actions"].insert_one(action)
+        return {"result": "File renamed"}
     except JWTError:
         raise credentials_exception
 
