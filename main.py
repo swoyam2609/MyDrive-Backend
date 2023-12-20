@@ -49,7 +49,7 @@ class UserInDB(User):
 class TokenData(BaseModel):
     username: Optional[str] = None
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="users/login")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -94,7 +94,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-@app.post("/users/token", tags=["User Accounts"])
+@app.post("/users/login", tags=["User Accounts"])
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     user_dict = db["users"].find_one({"username": form_data.username})
     if not user_dict:
@@ -412,6 +412,26 @@ async def unfavourite_file(token: str = Depends(oauth2_scheme), path: str = "/")
         }
         db["actions"].insert_one(action)
         return {"result": "File favourited"}
+    except JWTError:
+        raise credentials_exception
+    
+@app.get("/file/favourites", tags=["File Operations"])
+async def get_favourites(token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=401, detail="Could not validate credentials"
+    )
+    try:
+        import os
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        
+        favourites = []
+        for file in db["files"].find({"uploader": username, "favourite": True}):
+            file["_id"] = str(file["_id"])  # Convert ObjectId to string
+            favourites.append(file)
+        return {"favourites": favourites}
     except JWTError:
         raise credentials_exception
 
