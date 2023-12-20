@@ -11,6 +11,11 @@ import uvicorn
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from fastapi.responses import JSONResponse
+import random
 
 # MongoDB connection
 client = MongoClient("mongodb+srv://swoyam:iiitdrive@drive.9oviyyw.mongodb.net/")
@@ -47,6 +52,34 @@ class TokenData(BaseModel):
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def send_otp_email(email: str, otp: str):
+    subject = 'OTP for Password Reset'
+    body = f'Your OTP for password reset is: {otp}'
+    email_user = "jarvisnayak@gmail.com"
+    email_password = "mcpfkgjcxvrjxiru"
+
+    msg = MIMEMultipart()
+    msg['From'] = email_user
+    msg['To'] = email
+    msg['Subject'] = subject
+
+    msg.attach(MIMEText(body, 'plain'))
+
+    try:
+        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+            server.starttls()
+            server.login(email_user, email_password)
+
+            # Sending the email
+            server.sendmail(email_user, [email], msg.as_string())
+
+        return JSONResponse(content={"message": "Email sent successfully"}, status_code=200)
+    except Exception as e:
+        print(f"Error sending OTP to {email}: {e}")
+
+def generate_otp():
+    return str(random.randint(1000, 9999))
 
 def fake_hash_password(password: str):
     return pwd_context.hash(password)
@@ -98,6 +131,40 @@ async def signup(user: User, password: str):
     }
     db["actions"].insert_one(action)
     return {"result": "User created"}
+
+@app.post("/reset_password", tags=["User Accounts"])
+async def forgot_password(username: str):
+    user = db["users"].find_one({"username": username})
+    if user:
+        otp = generate_otp()
+        expiration_time = datetime.utcnow() + timedelta(minutes=5)
+        db["users"].update_one(
+            {"_id": user["_id"]},
+            {"$set": {"otp": otp, "otp_expiry": expiration_time}}
+        )
+        # Send OTP to the user (you can replace this with your actual logic)
+        send_otp_email(db["users"].find_one({"username": username})["email"], otp)
+        return {"message": "OTP sent successfully"}
+    else:
+        raise HTTPException(status_code=404, detail="User not found")
+
+@app.post("/reset_password/confirm", tags=["User Accounts"])  
+async def reset_password(
+    username: str,
+    new_password: str,
+    otp: str
+):
+    user = db["users"].find_one({"username": username})
+    if user and "otp" in user and user["otp"] == otp and datetime.utcnow() < user["otp_expiry"]:
+        # Reset the password (you can replace this with your actual password reset logic)
+        db["users"].update_one(
+            {"_id": user["_id"]},
+            {"$set": {"hashed_password": fake_hash_password(new_password), "otp": None, "otp_expiry": None}}
+        )
+        return JSONResponse(content={"message": "Password reset successfully"})
+    else:
+        raise HTTPException(status_code=400, detail="Invalid OTP or OTP expired")
+
 
 # for testing purpose, willbe deleted later
 @app.get("/users/me", tags=["Test"])
